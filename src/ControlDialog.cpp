@@ -16,6 +16,7 @@
 #include "common.hpp"
 #include "types.hpp"
 #include "Arm.hpp"
+#include "hexrays_Microcode.hpp"
 #include "DFGraph.hpp"
 #include "Broker.hpp"
 #include "Predicate.hpp"
@@ -28,6 +29,7 @@
 #include "SlidingStackedWidget.hpp"
 #include "AnalysisResult.hpp"
 #include "BlockPermutationEvaluator.hpp"
+
 
 void CoordinatorThread::run() {
 	std::list<unsigned long>::const_iterator itF;
@@ -97,7 +99,7 @@ void CoordinatorThread::run() {
 					if (oAnalysisResult->AllResultsSet()) {
 _all_results_set:
 						aResultTracker.erase(oEvaluationResult->oCodeGraph);
-						emit ResultReady(oAnalysisResult);
+						qt_emit ResultReady(oAnalysisResult);
 					}
 				}
 				break;
@@ -110,22 +112,31 @@ _all_results_set:
 	}
 
 	wc_debug("[+] Analysis finished. Total running time was %fs\n", (double)(GetTickCount() - dwStartTime) / 1000);
-	emit CoordinatorFinished();
+	qt_emit CoordinatorFinished();
 }
+
+
+
 
 bool CoordinatorThread::ScheduleNextFunction(ThreadPool &oPool) {
 	std::list<unsigned long>::iterator itF = aFunctionList.begin();
 	if (itF != aFunctionList.end()) {
+
+		// Processor oProcessor(Processor::typecast(Arm::create()));
+
 		Processor oProcessor(Processor::typecast(Arm::create()));
 		bool bScheduled = CodeBrokerImpl::ScheduleBuild(oProcessor, oPool, *itF, nullptr, true);
 		if (bScheduled) {
 			aFunctionList.erase(itF);
-			emit NextFunction();
+			qt_emit NextFunction();
 		}
 		return bScheduled;
 	}
 	return false;
+
 }
+
+
 
 void ControlDialog::SetupFunctionSelector() {
 	lpFunctionList = new FunctionList();
@@ -204,7 +215,8 @@ void ControlDialog::CoordinatorFinished() {
 void ControlDialog::StartAnalysis(bool bBatchRun) {
 	lpNextButton->setEnabled(false);
 	lpBatchButton->setEnabled(false);
-	emit slideInIdx(1);
+	lpMicrocodeButton->setEnabled(false); 
+	qt_emit slideInIdx(1);
 
 	lpCoordinatorThread = new CoordinatorThread;
 
@@ -226,8 +238,41 @@ void ControlDialog::StartAnalysis(bool bBatchRun) {
 	lpCoordinatorThread->start();
 }
 
+//开始分析函数的microcode
+void ControlDialog::StartMicrocodeAnalysis(bool bBatchRun) {
+	lpNextButton->setEnabled(false);
+	lpBatchButton->setEnabled(false);
+	qt_emit slideInIdx(1);
+
+	lpCoordinatorThread = new CoordinatorThread;
+
+	connect(lpCoordinatorThread, SIGNAL(ResultReady(AnalysisResult)), this, bBatchRun ?
+		SLOT(HandleResultBatch(AnalysisResult)) :
+		SLOT(HandleResultNormal(AnalysisResult))
+	);
+	connect(lpCoordinatorThread, SIGNAL(CoordinatorFinished()), this, SLOT(CoordinatorFinished()));
+	connect(lpCoordinatorThread, SIGNAL(NextFunction()), this, SLOT(NextFunction()));
+	connect(lpCoordinatorThread, SIGNAL(finished()), lpCoordinatorThread, SLOT(deleteLater()));
+
+	lpCoordinatorThread->aFunctionList = lpFunctionList->GetSelection();
+	lpCoordinatorThread->aSignatureList = aSignatureList;
+
+	dwNumFunctions = dwNumFunctionsLeft = lpCoordinatorThread->aFunctionList.size();
+
+	lpProgressBar->setRange(0, dwNumFunctions);
+	lpProgressHeader->setText("Analysis in progress...");
+	lpCoordinatorThread->start();
+
+
+
+}
+
 void ControlDialog::StartAnalysis() {
 	return StartAnalysis(false);
+}
+
+void ControlDialog::StartMicrocodeAnalysis() {
+	return StartMicrocodeAnalysis(false);
 }
 
 void ControlDialog::StartBatchRun() {
@@ -319,6 +364,7 @@ ControlDialog::ControlDialog()
 	lpLayout = new QGridLayout(this);
 	lpNextButton = new QPushButton(QIcon(":/images/wherescrypto.png"), "Analyze");
 	lpBatchButton = new QPushButton(QIcon(":/images/wherescrypto.png"), "Batch run");
+	lpMicrocodeButton = new QPushButton("MAnalyze");
 	lpPrevButton = new QPushButton("Previous");
 	lpCancelButton = new QPushButton("Cancel");
 	//lpSplitter = new QSplitter(Qt::Horizontal);
@@ -330,6 +376,7 @@ ControlDialog::ControlDialog()
 	lpLayout->addWidget(lpCancelButton, 1, 2, 1, 1, Qt::AlignVCenter | Qt::AlignRight);
 	lpLayout->addWidget(lpPrevButton, 1, 3, 1, 1, Qt::AlignVCenter | Qt::AlignRight);
 	lpLayout->addWidget(lpNextButton, 1, 4, 1, 1, Qt::AlignVCenter | Qt::AlignRight);
+	lpLayout->addWidget(lpMicrocodeButton, 1, 1, 1, 1, Qt::AlignVCenter | Qt::AlignRight);
 	lpLayout->addWidget(lpStatusBar, 2, 0, 1, 5);
 	lpLayout->setRowStretch(0, 1);
 	lpLayout->setColumnStretch(1, 1);
@@ -349,6 +396,8 @@ ControlDialog::ControlDialog()
 
 	connect(lpBatchButton, SIGNAL(released()), this, SLOT(StartBatchRun()));
 	connect(lpNextButton, SIGNAL(released()), this, SLOT(StartAnalysis()));
+	//连接
+	connect(lpMicrocodeButton, SIGNAL(released()), this, SLOT(StartMicrocodeAnalysis()));
 	connect(lpPrevButton, SIGNAL(released()), lpSlider, SLOT(slideInPrev()));
 	connect(lpCancelButton, SIGNAL(released()), this, SLOT(reject()));
 	connect(this, SIGNAL(slideInIdx(int)), lpSlider, SLOT(slideInIdx(int)));

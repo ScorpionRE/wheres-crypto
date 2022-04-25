@@ -30,6 +30,7 @@ public:
 
 private:
 	bool ScheduleNextFunction(ThreadPool &oPool);
+	bool ScheduleNextFunctionMicrocode(ThreadPool& oPool);
 
 signals:
 	void ResultReady(AnalysisResult oResult);
@@ -72,6 +73,7 @@ private:
 	QLabel* lpProgressHeader;
 	QPushButton *lpBatchButton;
 	QPushButton *lpNextButton;
+	QPushButton *lpMicrocodeButton;
 	QPushButton *lpPrevButton;
 	QPushButton *lpCancelButton;
 	QProgressBar *lpProgressBar;
@@ -85,10 +87,12 @@ private:
 
 	void ConstructSignatures();
 	void StartAnalysis(bool bBatchRun);
+	void StartMicrocodeAnalysis(bool bBatchRun);
 	void HandleResult(bool bBatchRun, AnalysisResult oResult);
 
 private slots:
 	void StartAnalysis();
+	void StartMicrocodeAnalysis();
 	void StartBatchRun();
 	void HandleResultNormal(AnalysisResult oResult);
 	void HandleResultBatch(AnalysisResult oResult);

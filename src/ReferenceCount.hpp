@@ -3,6 +3,7 @@
 #include <atomic>
 #include <unordered_map>
 
+
 /*
  * We implement our own reference counting rather than relying on std::shared_ptr,
  * since we prefer to have the control block contained within the object itself

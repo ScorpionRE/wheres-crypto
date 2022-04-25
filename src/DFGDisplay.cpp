@@ -8,7 +8,7 @@ void DFGDisplayImpl::Display() {
 	netnode id;
 	id.create((std::string("$ dfgraph ") + szTitle).c_str());
 	lpViewer = create_graph_viewer(szTitle.c_str(), id, gr_callback, this, 0);
-	display_widget(lpViewer, WOPN_TAB);
+	display_widget(lpViewer, 0x02); //WOPN_TAB(0x02)
 	ref();
 }
 
